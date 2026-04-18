@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cookie Clicker Made By Nexus</title>
+     <link rel="icon" href="favicon.ico" type="image/x-icon">
+    <style>
+        :root { --primary: #8b4513; --secondary: #d2691e; --bg: #f4f1ea; --panel: #ffffff; --accent: #4caf50; --price: #b22222; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; display: flex; flex-direction: column; align-items: center; color: #333; }
+
+        .game-container { display: grid; grid-template-columns: 350px 1fr; gap: 20px; max-width: 1200px; width: 95%; margin-top: 20px; }
+
+        /* Left Column */
+        .cookie-section { background: var(--panel); padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; height: fit-content; position: sticky; top: 20px; }
+        .cookie-svg { width: 180px; height: 180px; cursor: pointer; transition: transform 0.05s; filter: drop-shadow(0 5px 10px rgba(0,0,0,0.1)); }
+        .cookie-svg:active { transform: scale(0.92); }
+        .stats-main { font-size: 2.2rem; font-weight: bold; margin: 10px 0; color: var(--primary); }
+
+        /* Tabs */
+        .content-section { background: var(--panel); border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; display: flex; flex-direction: column; }
+        .tabs { display: flex; background: #eee; border-bottom: 1px solid #ddd; }
+        .tab { flex: 1; padding: 15px; text-align: center; cursor: pointer; font-weight: bold; font-size: 0.9rem; border-right: 1px solid #ddd; transition: 0.2s; }
+        .tab:last-child { border-right: none; }
+        .tab.active { background: var(--panel); color: var(--secondary); border-bottom: 3px solid var(--secondary); margin-bottom: -1px; }
+
+        .view { display: none; padding: 20px; height: 600px; overflow-y: auto; }
+        .view.active { display: block; }
+
+        /* Cards */
+        .card { display: flex; align-items: center; padding: 12px; margin-bottom: 12px; border: 1px solid #eee; border-radius: 10px; background: #fafafa; transition: 0.2s; }
+        .card:hover { border-color: var(--secondary); }
+        .icon { width: 50px; height: 50px; background: #eee; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 24px; margin-right: 15px; flex-shrink: 0; border: 1px solid #ddd; }
+        .info { flex-grow: 1; }
+        .info b { font-size: 1rem; color: var(--primary); }
+        .info p { margin: 2px 0; font-size: 0.8rem; color: #666; }
+        .price { color: var(--price); font-weight: bold; }
+        .multiplier-tag { color: var(--accent); font-weight: bold; font-size: 0.75rem; background: #e8f5e9; padding: 2px 6px; border-radius: 4px; }
+
+        button.buy-btn { background: var(--secondary); color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        button.buy-btn:hover:not(:disabled) { background: var(--primary); }
+        button.buy-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+        .stats-table { width: 100%; border-collapse: collapse; }
+        .stats-table td { padding: 12px; border-bottom: 1px solid #eee; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <div class="cookie-section">
+            <div class="stats-main" id="cookieCount">0</div>
+            <div style="font-weight: bold; color: #888; letter-spacing: 1px; margin-bottom: 15px;">COOKIES</div>
+            <svg class="cookie-svg" id="cookieButton" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="45" fill="#d2691e"/>
+                <circle cx="30" cy="30" r="5" fill="#4b2e1a"/><circle cx="70" cy="40" r="5" fill="#4b2e1a"/>
+                <circle cx="40" cy="70" r="5" fill="#4b2e1a"/><circle cx="65" cy="75" r="5" fill="#4b2e1a"/>
+            </svg>
+            <p id="cpsDisplay" style="font-weight: bold; font-size: 1.1rem; margin-top: 15px;">CPS: 0</p>
+            <p id="cpcDisplay" style="color: #666; font-size: 0.9rem;">Per Click: 1</p>
+        </div>
+
+        <div class="content-section">
+            <div class="tabs">
+                <div class="tab active" id="tab-shop" onclick="switchTab('shop')">Buildings</div>
+                <div class="tab" id="tab-upgrades" onclick="switchTab('upgrades')">Research</div>
+                <div class="tab" id="tab-stats" onclick="switchTab('stats')">Stats</div>
+            </div>
+
+            <div id="shop" class="view active"></div>
+            <div id="upgrades" class="view"></div>
+            <div id="stats" class="view">
+                <h2>Statistics</h2>
+                <table class="stats-table" id="statsList"></table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let cookies = 0;
+        let totalEarned = 0;
+        let totalClicks = 0;
+        let globalMultiplier = 1.0;
+        let clickMultiplier = 1.0;
+
+        const buildings = [
+            { name: "Cursor", cost: 15, baseCps: 0.1, count: 0, icon: "🖱️", mult: 1 },
+            { name: "Grandma", cost: 100, baseCps: 1, count: 0, icon: "👵", mult: 1 },
+            { name: "Farm", cost: 1100, baseCps: 8, count: 0, icon: "🚜", mult: 1 },
+            { name: "Mine", cost: 12000, baseCps: 47, count: 0, icon: "⛏️", mult: 1 },
+            { name: "Factory", cost: 130000, baseCps: 260, count: 0, icon: "🏭", mult: 1 },
+            { name: "Bank", cost: 1400000, baseCps: 1400, count: 0, icon: "🏦", mult: 1 },
+            { name: "Temple", cost: 20000000, baseCps: 7800, count: 0, icon: "⛩️", mult: 1 },
+            { name: "Wizard Tower", cost: 330000000, baseCps: 44000, count: 0, icon: "🧙", mult: 1 },
+            { name: "Shipment", cost: 5100000000, baseCps: 260000, count: 0, icon: "🚀", mult: 1 },
+            { name: "Alchemy Lab", cost: 75000000000, baseCps: 1600000, count: 0, icon: "🧪", mult: 1 }
+        ];
+
+        const research = [
+            { name: "Plastic Mouse", cost: 500, desc: "Clicks are 2x powerful", type: "click", power: 2, icon: "🖱️", bought: false },
+            { name: "Iron Mouse", cost: 5000, desc: "Clicks are 2x powerful", type: "click", power: 2, icon: "🖱️", bought: false },
+            { name: "Reinforced Index", cost: 1000, desc: "Global production x1.1", type: "global", power: 1.1, icon: "☝️", bought: false },
+            { name: "Rolling Pins", cost: 2000, desc: "Grandmas are 2x as fast", type: "building", target: 1, power: 2, icon: "👵", bought: false },
+            { name: "Fertilizer", cost: 15000, desc: "Farms are 2x as fast", type: "building", target: 2, power: 2, icon: "🚜", bought: false },
+            { name: "Mega Drill", cost: 100000, desc: "Mines are 2x as fast", type: "building", target: 3, power: 2, icon: "⛏️", bought: false },
+            { name: "Sweatshops", cost: 500000, desc: "Factories are 2x as fast", type: "building", target: 4, power: 2, icon: "🏭", bought: false },
+            { name: "Stock Market", cost: 5000000, desc: "Banks are 2x as fast", type: "building", target: 5, power: 2, icon: "🏦", bought: false },
+            { name: "Ancient Rituals", cost: 100000000, desc: "Temples are 2x as fast", type: "building", target: 6, power: 2, icon: "⛩️", bought: false },
+            { name: "Cookie Ads", cost: 1000000, desc: "Global production x1.5", type: "global", power: 1.5, icon: "📢", bought: false },
+            { name: "Quantum Clicking", cost: 10000000, desc: "Clicks are 5x powerful", type: "click", power: 5, icon: "✨", bought: false }
+        ];
+
+        function initGame() {
+            const shop = document.getElementById('shop');
+            buildings.forEach((b, i) => {
+                shop.innerHTML += `
+                    <div class="card">
+                        <div class="icon">${b.icon}</div>
+                        <div class="info">
+                            <b>${b.name}</b> (<span id="qty-${i}">0</span>)<br>
+                            <p>Cost: <span class="price" id="cost-${i}">${b.cost.toLocaleString()}</span></p>
+                            <span class="multiplier-tag" id="mult-${i}">1x Eff.</span>
+                        </div>
+                        <button class="buy-btn" id="btn-b-${i}" onclick="buyBuilding(${i})">Buy</button>
+                    </div>`;
+            });
+
+            const upgradeList = document.getElementById('upgrades');
+            research.forEach((u, i) => {
+                upgradeList.innerHTML += `
+                    <div class="card" id="upg-card-${i}">
+                        <div class="icon">${u.icon}</div>
+                        <div class="info">
+                            <b>${u.name}</b><br>
+                            <p>${u.desc}</p>
+                            <p class="price">Cost: ${u.cost.toLocaleString()}</p>
+                        </div>
+                        <button class="buy-btn" id="btn-u-${i}" onclick="buyResearch(${i})">Research</button>
+                    </div>`;
+            });
+        }
+
+        function calculateCPS() {
+            return buildings.reduce((acc, b) => acc + (b.count * b.baseCps * b.mult), 0) * globalMultiplier;
+        }
+
+        function calculateCPC() {
+            return 1 * clickMultiplier;
+        }
+
+        function buyBuilding(i) {
+            if (cookies >= buildings[i].cost) {
+                cookies -= buildings[i].cost;
+                buildings[i].count++;
+                buildings[i].cost = Math.floor(buildings[i].cost * 1.15);
+                updateUI();
+            }
+        }
+
+        function buyResearch(i) {
+            const upg = research[i];
+            if (cookies >= upg.cost && !upg.bought) {
+                cookies -= upg.cost;
+                upg.bought = true;
+                if (upg.type === "global") globalMultiplier *= upg.power;
+                if (upg.type === "click") clickMultiplier *= upg.power;
+                if (upg.type === "building") buildings[upg.target].mult *= upg.power;
+
+                document.getElementById(`upg-card-${i}`).style.display = "none";
+                updateUI();
+            }
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            document.getElementById('tab-' + tabId).classList.add('active');
+        }
+
+        function updateUI() {
+            const cps = calculateCPS();
+            const cpc = calculateCPC();
+            document.getElementById('cookieCount').innerText = Math.floor(cookies).toLocaleString();
+            document.getElementById('cpsDisplay').innerText = `CPS: ${cps.toLocaleString(undefined, {maximumFractionDigits: 1})}`;
+            document.getElementById('cpcDisplay').innerText = `Per Click: ${cpc.toLocaleString()}`;
+
+            // Statistics
+            const statsHtml = `
+                <tr><td>Current Cookies</td><td>${Math.floor(cookies).toLocaleString()}</td></tr>
+                <tr><td>Lifetime Earnings</td><td>${Math.floor(totalEarned).toLocaleString()}</td></tr>
+                <tr><td>Global Multiplier</td><td>${globalMultiplier.toFixed(2)}x</td></tr>
+                <tr><td>Click Multiplier</td><td>${clickMultiplier.toFixed(2)}x</td></tr>
+                <tr><td>Total Hand Clicks</td><td>${totalClicks.toLocaleString()}</td></tr>
+            `;
+            document.getElementById('statsList').innerHTML = statsHtml;
+
+            buildings.forEach((b, i) => {
+                document.getElementById(`qty-${i}`).innerText = b.count;
+                document.getElementById(`cost-${i}`).innerText = b.cost.toLocaleString();
+                document.getElementById(`mult-${i}`).innerText = b.mult + "x Eff.";
+                document.getElementById(`btn-b-${i}`).disabled = cookies < b.cost;
+            });
+
+            research.forEach((u, i) => {
+                if (!u.bought) {
+                    document.getElementById(`btn-u-${i}`).disabled = cookies < u.cost;
+                }
+            });
+        }
+
+        document.getElementById('cookieButton').onclick = () => {
+            const gain = calculateCPC();
+            cookies += gain; totalEarned += gain; totalClicks++;
+            updateUI();
+        };
+
+        setInterval(() => {
+            const gain = calculateCPS() / 10;
+            cookies += gain;
+            totalEarned += gain;
+            updateUI();
+        }, 100);
+
+        initGame();
+        updateUI();
+    </script>
+</body>
+</html>
